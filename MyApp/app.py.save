@@ -1,0 +1,99 @@
+import os
+import psycopg2
+from flask import Flask, render_template
+from multiprocessing import connection
+import time
+import board
+import psycopg2
+import datetime
+import adafruit_dht
+import RPi.GPIO as GPIO
+
+app = Flask(__name__)
+
+def get_db_connection():
+    # Establishing a connection with the Postgres Database.
+    connection = psycopg2.connect(
+    host="localhost",
+        database="weatherlogger",
+        user="hari",
+        password="gigabit"
+        )  
+
+    return connection
+
+
+def collect_data():
+	connection = get_db_connection()
+	GPIO.setmode(GPIO.BCM) 
+	GPIO.setwarnings(False)
+	GPIO.setup(18, GPIO.OUT, initial=GPIO.LOW)
+	# Initialize the DHT22 sensor and specify the Data Pin connected to the GPIO Port. In my case it was GPIO Port 4:
+	TemperatureHumiditySensor = adafruit_dht.DHT22(board.D4)
+
+	# Creating a cursor object which will later help us execute Postgres commands.
+	cursor = connnection.cursor()
+
+	i=0
+
+	while True:
+		try:
+			GPIO.output(18, GPIO.HIGH)
+        # Reading the Temperature
+        		TemperatureCelsius = TemperatureHumiditySensor.temperature
+
+        # Converting the temperature from Celsius to Farenheit.
+		        TemperatureFarenheit = TemperatureCelsius * (9 / 5) + 32
+
+        # Reading the Humidity
+        		Humidity = TemperatureHumiditySensor.humidity
+        		print("Temp: {:.3f} F / {:.3f} C    Humidity: {}% ".format(TemperatureFarenheit, TemperatureCelsius, Humidity
+            )
+        )
+
+        CurrentTime = datetime.datetime.now()
+
+        #Inserting elements into table 
+        cursor.execute('INSERT INTO temperatures VALUES(%s, %s, %s, %s)' , (CurrentTime, TemperatureFarenheit, TemperatureCelsius, Humidity))
+        i+=1
+
+        connnection.commit()
+
+        GPIO.output(18, GPIO.LOW)
+
+    except RuntimeError as error:
+        # Errors happen fairly often, DHT's are hard to read, just keep going
+        print(error.args[0])
+        GPIO.output(18, GPIO.LOW)
+        time.sleep(2.0)
+        
+    except Exception as error:
+        TemperatureHumiditySensor.exit()
+        GPIO.output(18, GPIO.LOW)
+        raise error
+
+    time.sleep(2.0)
+
+    if i == 10:
+        #cursor.execute('SELECT * FROM temperatures LIMIT 5')
+        #connnection.commit()
+        #result = cursor.fetchall()
+        cursor.execute('DELETE FROM temperatures WHERE ctid IN (SELECT ctid FROM temperatures ORDER BY time LIMIT 5)')
+        connnection.commit()
+        
+    
+    connnection.close()
+    return render_template('index.html', weather=weather)
+
+
+@app.route('/')
+def index():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM temperatures;')
+    weather = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template('index.html', weather=weather)
+
+

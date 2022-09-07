@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>{% block title %} Weather {% endblock %}</h1>
+
+    
+    <h3>Date and Time &emsp;&emsp;&emsp;&emsp;&emsp; Temperature_F  &emsp;&emsp;&emsp;&emsp;&emsp; Humidity</h3>
+  
+
+    
+    {% for each in weather %}
+        <div class='Weather'>
+            <p>{{ each[0] }}      &emsp;&emsp;       {{ each[1] }}       &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;        {{ each[2] }}</p>
+        </div>
+    {% endfor %}
+{% endblock %}
